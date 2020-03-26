@@ -1,0 +1,50 @@
+---
+title: "test"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(plotly)
+library(data.table)
+```
+
+
+## Burrows.csv data
+```{r}
+burrows <- data.table::fread('https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/burrows.csv')
+
+mapboxToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ'
+
+Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+
+fig <- burrows %>% plot_mapbox(lat= ~Lat, lon= ~Lon, split= ~Burrow, size=1,
+                               mode='scattermapbox')
+fig <- fig %>% layout(title='Uber pickup locations',
+                      mapbox = list(zoom=10,
+                                    center= list(lat = median(burrows$Lat),
+                                                lon = median(burrows$Lon))
+                                    ))
+
+fig <- fig %>% config(mapboxAccessToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ')
+
+#fig <- fig %>% animation_opts(frame= burrows$Month, redraw=TRUE)
+
+
+fig
+```
+
+
+# Holiday.csv data
+
+```{r}
+#holiday <- data.table::fread('https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/holiday.csv')
+
+
+```
+
+
+
