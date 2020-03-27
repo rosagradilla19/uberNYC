@@ -53,15 +53,15 @@ shinyServer(function(input, output, session) {
       
       mapboxToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ'
       Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
-      fig <- burrows %>% plot_mapbox(lat= ~Lat, lon= ~Lon, split= ~Burrow, frame = ~Month, size=2,
+      fig <- burrows %>% plot_mapbox(lat= ~Lat, lon= ~Lon, split= ~Burrow, frame = ~Month, size=1,
                                      mode='scattermapbox')
-      fig <- fig %>% layout(title='Uber Pickup Locations',
+      fig <- fig %>% layout(title='Uber Pickup Locations', height = 600,
                             mapbox = list(zoom=10,
                                           center= list(lat = median(burrows$Lat),
                                                        lon = median(burrows$Lon))
                             ))
       fig <- fig %>% config(mapboxAccessToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ')
-      fig <- fig %>% animation_opts(redraw=FALSE)
+      fig <- fig %>% animation_opts(redraw=TRUE)
       fig
    })
 
