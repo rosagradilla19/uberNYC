@@ -18,12 +18,15 @@ shinyUI(navbarPage(title = "NYC Uber",
                         br(), 
                         br(), 
                         plotlyOutput('holidays'), 
-                        br()),
+                        br(),
+                        plotlyOutput('holidaysmap')),
                tabPanel("Uber by Burrow", 
                         div(plotlyOutput('burrow'),align ='center'), 
                         br(), 
                         plotlyOutput('burrowmap')),
                tabPanel("Taxi vs Uber", 
-                        plotlyOutput("taxi"))
+                        plotlyOutput("taxi"),
+                        br(),
+                        plotlyOutput('taximap'))
           )
 )
