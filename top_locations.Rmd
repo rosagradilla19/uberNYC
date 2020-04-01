@@ -1,0 +1,147 @@
+---
+title: "uber exploration"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(plotly)
+```
+
+```{r}
+#stpatricks<- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/stpatricks.csv")
+#fourthjuly<- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/fourthjuly.csv")
+#nycpride <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/nycpride.csv")
+burrows <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/burrows.csv")
+rides <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/rides.csv")
+#holiday <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/mergedholiday.csv")
+
+```
+
+```{r}
+uber_locations_full <- rides %>% filter(Label == "Uber") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ","))
+
+taxi_locations_full <- rides %>% filter(Label == "Taxi") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ","))
+
+```
+
+```{r}
+uber_top_locations <- rides %>% filter(Label == "Uber") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n = 50, wt =count) 
+
+taxi_top_locations <- rides %>% filter(Label == "Taxi") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n = 50, wt =count) 
+
+```
+
+```{r}
+uber_top <- uber_top_locations %>% left_join(uber_locations_full, by = "Lat_Long") %>% distinct(Lat_Long, .keep_all = TRUE) %>% top_n(n = 50, wt = count)
+
+taxi_top <- taxi_top_locations %>% left_join(taxi_locations_full, by = "Lat_Long") %>% distinct(Lat_Long, .keep_all = TRUE) #%>% top_n(n = 50, wt = count)
+
+taxi_top <- taxi_top[order(-taxi_top$count),]
+
+taxi_top <- taxi_top[1:50,]
+taxi_top
+```
+
+
+```{r}
+top_uber_taxi <- rbind(uber_top, taxi_top)
+
+top_uber_taxi
+```
+
+
+```{r}
+       mapboxToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ'
+       
+       Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+       
+       fig2 <-  top_uber_taxi %>% plot_mapbox(lat= ~Lat, lon= ~Lon, split=~Label,
+                                      mode='scattermapbox', opacity=0.7, size=~count, sizeref=0.5) #marker=list( sizeref=3))
+                                                                                    
+       fig2 <- fig2 %>% layout(title='Top 50 pickup locations Uber vs Taxi', height=600,
+                             mapbox = list(zoom=10,
+                                           center= list(lat = 40.7426,
+                                                        lon = -73.9831),
+                                           style = 'outdoors'
+                             ))
+       
+       fig2 <- fig2 %>% config(mapboxAccessToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ')
+       #fig <- fig %>% animation_opts(redraw=TRUE)
+       fig2
+```
+
+```{r}
+burrows_day <- read_csv('https://raw.githubusercontent.com/rosagradilla19/uberNYC/master/burrows_day.csv')
+
+burrows_day <- as.data.frame(burrows_day)
+```
+```{r}
+burrow_by_day2 <- burrows_day %>%
+  group_by(day,Burrow) %>%
+  ungroup()
+  
+burrow_by_day2 <- burrow_by_day2 %>%
+  select(X1, day, Burrow, hour)
+
+burrow_by_hour <- burrows_day %>%
+  group_by(hour, Burrow) %>%
+  ungroup()
+
+burrow_by_hour <- burrow_by_hour %>%
+  select(X1, hour, Burrow, Lat,Lon)
+```
+
+
+```{r}
+burrow_by_day2 <- burrow_by_day2 %>%
+  dplyr::mutate(day = factor(day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")))
+
+burrow_by_hour <- burrow_by_hour %>%
+  dplyr::mutate(hour = factor(hour, levels = seq(0:24)))
+```
+
+
+# plotly
+```{r}
+plotly.hour <-  burrow_by_hour %>% group_by(hour,Burrow) %>% summarise(count = n()) %>% ungroup()
+
+burrow.by.hour <- plot_ly(plotly.hour, x=~hour, y=~count, type='bar', split=~Burrow)
+
+burrow.by.hour <- burrow.by.hour %>% layout(barmode= 'stack')
+
+burrow.by.hour
+```
+
+```{r}
+plotly.burrow <- burrow_by_day2 %>% group_by(day,Burrow) %>% summarise(count = n()) %>% ungroup()
+
+burrow.by.day <- plot_ly(plotly.burrow, x=~day, y=~count, type='bar', split=~Burrow)
+
+burrow.by.day <- burrow.by.day %>% layout(barmode= 'stack')
+
+burrow.by.day
+```
+
+
+# ggplot
+```{r}
+p <- ggplot(burrow_by_day2, aes(x=day)) + geom_bar(aes(fill=Burrow)) + labs(y='Count', x= 'Day of the Week')
+
+p
+```
+
+
+
+```{r}
+burrow_by_hour <- drop_na(burrow_by_hour)
+p <- ggplot(burrow_by_hour, aes(x=hour)) + geom_bar(aes(fill=Burrow))
+p
+```
+
+
+
+
+
