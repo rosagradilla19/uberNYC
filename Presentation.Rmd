@@ -3,38 +3,32 @@ title: "NYC Uber Presentation"
 output: html_document
 ---
 
-```{r}
-library(readr)
+```{r, warning = FALSE, message = FALSE}
 library(tidyverse)
 library(plotly)
-
+library(class)
+library(e1071)
+library(caTools)
+library(MASS)
+library(revgeo)
+library(kableExtra)
 ```
 
-```{r}
-stpatricks<- read_csv("stpatricks.csv")
-fourthjuly<- read_csv("fourthjuly.csv")
-nycpride<- read_csv("nycpride.csv")
+# Holiday Plot  
+
+```{r, warning = FALSE, message = FALSE}
+stpatricks<- read_csv("CSVs/stpatricks.csv")
+fourthjuly<- read_csv("CSVs/fourthjuly.csv")
+nycpride<- read_csv("CSVs/nycpride.csv")
 
 nycpride<- nycpride[,c("Time", "Label")]
 fourthjuly<- fourthjuly[,c("Time", "Label")]
 stpatricks<- stpatricks[,c("Time", "Label")]
 
-```
-
-```{r}
 data<- rbind(nycpride, fourthjuly, stpatricks)
-head(data)
-
-data %>% group_by(Label) %>% summarise(count = n())
-```
-
-```{r}
+data %>% group_by(Label) %>% summarise(ount = n())
 data_plot<- data %>% group_by(Label, Time) %>% summarise(count = n())
-data_plot
 
-```
-
-```{r}
 nycpride<- subset(data_plot, Label == "NYC Pride" & Time > 0)
 stpatricks<- subset(data_plot, Label == "St. Patrick's Day")
 fourthjuly<- subset(data_plot, Label == "Fourth of July")
@@ -47,38 +41,276 @@ point_a <- list(x = a$Time, y = a$count, text = "3pm", xref = "x", yref = "y", s
 point_b <- list(x = b$Time, y = b$count, text = "9pm", xref = "x", yref = "y", showarrow = TRUE, arrowhead = 7, ax = 20, ay = -40)
 point_c <- list(x = c$Time, y = c$count, text = "10pm", xref = "x", yref = "y", showarrow = TRUE, arrowhead = 7, ax = 20, ay = -40)
 
-plot_ly(data_plot, x = ~Time, y = ~count, color = ~Label, mode = 'lines+markers', colors = c("#879BAF", "#c28285", "#2e8b57")) %>% layout(title = "Holiday", annotations = list(point_a, point_b, point_c)) 
+plot_ly(data_plot, x = ~Time, y = ~count, color = ~Label, mode = 'lines+markers', colors = c("#879BAF", "#c28285", "#2e8b57")) %>% layout(yaxis = list(title = "Count"), annotations = list(point_a, point_b, point_c)) 
+
+```
+
+# Top locations by Peak Time Holiday
+
+```{r, warning = FALSE, message = FALSE}
+stpatricks<- read_csv("CSVs/stpatricks.csv")
+fourthjuly<- read_csv("CSVs/fourthjuly.csv")
+nycpride<- read_csv("CSVs/nycpride.csv")
+
+fourthjuly_locations<- fourthjuly %>% filter(Time >= 20 & Time <= 23) %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Time, Lat_Long) %>% summarise(count = n()) %>% arrange(desc(count)) %>% top_n(n = 15, wt = count)
+fourthjuly_locations<- fourthjuly_locations[1:15,]
+nycpride_locations<- nycpride %>% filter(Time >= 14 & Time <= 19) %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Time, Lat_Long) %>% summarise(count = n()) %>% arrange(desc(count)) %>% top_n(n = 15, wt = count)
+nycpride_locations<- nycpride_locations[1:15,]
+
+fourthjuly_address<- fourthjuly %>%  mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% left_join(fourthjuly_locations, by = "Lat_Long") %>% filter(is.na(count) == FALSE) %>% distinct(Lat_Long, .keep_all = TRUE) %>% mutate(Address = revgeo(Lon, Lat)) %>% arrange(desc(count))
+
+nycpride_address<- nycpride %>%  mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% left_join(nycpride_locations, by = "Lat_Long") %>% filter(is.na(count) == FALSE) %>% distinct(Lat_Long, .keep_all = TRUE) %>% mutate(Address = revgeo(Lon, Lat)) %>% arrange(desc(count))
+
+```
+
+```{r}
+add_func<- function(x) {
+  for (i in 1:nrow(x)) {
+    row<- x[i,1]
+    row_split<- strsplit(as.character(row), ",")
+    if (grepl("Street Not Found", row_split[[1]][1]) == TRUE) {
+      x[i,1]<- ""
+    }
+  }
+  return(x)
+}
+
+```
+
+```{r}
+fourthjuly_add_df<- cbind(unlist(fourthjuly_address$Address), fourthjuly_address$Time.x, fourthjuly_address$count)
+colnames(fourthjuly_add_df)<- c("Address", "Time", "Count")
+
+x<- as.data.frame(fourthjuly_add_df[,1])
+y<- add_func(x)
+fourthjuly_add_df<- cbind(y, fourthjuly_add_df[,-1])
+colnames(fourthjuly_add_df)<- c("Address", "Time", "Count")
+fourthjuly_add_df<- fourthjuly_add_df %>% filter(is.na(Address) == FALSE)
+
+new_fourth_add_df<- data.frame("Address" = c(rep(0, 13)))
+for (i in 1:nrow(fourthjuly_add_df)) {
+  if (grepl("House Number Not", strsplit(as.character(fourthjuly_add_df$Address), "Found")[[i]][1]) == TRUE) {
+    x<- strsplit(as.character(fourthjuly_add_df$Address), "Found")[[i]][2]
+    new_fourth_add_df[i,1]<- x
+  }
+  else {
+    new_fourth_add_df[i,1]<- as.vector(fourthjuly_add_df[i,1])
+  }
+}
+fourthjuly_add_df<- cbind(new_fourth_add_df, fourthjuly_add_df[,2:3]) %>% kable() %>% kable_styling()
+fourthjuly_add_df
+
+```
+
+```{r}
+nycpride_add_df<- cbind(unlist(nycpride_address$Address), nycpride_address$Time.x, nycpride_address$count)
+colnames(nycpride_add_df)<- c("Address", "Time", "Count")
+
+x<- as.data.frame(nycpride_add_df[,1])
+y<- add_func(x)
+nycpride_add_df<- cbind(y, nycpride_add_df[,-1])
+colnames(nycpride_add_df)<- c("Address", "Time", "Count")
+nycpride_add_df<- nycpride_add_df %>% filter(is.na(Address) == FALSE)
+
+new_pride_add_df<- data.frame("Address" = c(rep(0, 8)))
+for (i in 1:nrow(nycpride_add_df)) {
+  if (grepl("House Number Not", strsplit(as.character(nycpride_add_df$Address), "Found")[[i]][1]) == TRUE) {
+    x<- strsplit(as.character(nycpride_add_df$Address), "Found")[[i]][2]
+    new_pride_add_df[i,1]<- x
+  }
+  else {
+    new_pride_add_df[i,1]<- as.vector(nycpride_add_df[i,1])
+  }
+}
+nycpride_add_df<- cbind(new_pride_add_df, nycpride_add_df[,2:3]) %>% kable() %>% kable_styling()
+nycpride_add_df
 
 ```
 
 
-```{r}
-burrows<- read_csv("burrows.csv")
-month<- burrows %>% group_by(Month) %>% summarise(count = n())
-burrow_month<- burrows %>% group_by(Month, Burrow) %>% summarise(count = n())
+# Burrow Plot  
 
-data<- left_join(burrow_month, month, by = 'Month')
-data<- data %>% mutate(Percent = (count.x/count.y)*100)
+```{r, warning = FALSE, message = FALSE}
+data<- read_csv("CSVs/burrows.csv")
+data<- data %>% group_by(Month, Burrow) %>% summarise(Count = n())
 
-```
-
-```{r}
 xform <- list(categoryorder = "array", categoryarray = c("April", "May", "June", "July", "August", "September"))
 
-plot_ly(data, x = ~Month, y = ~count.x, color = ~Burrow, type = 'bar') %>% layout(yaxis = list(title = 'Count'), xaxis = xform, barmode = 'group')
+plot_ly(data, x = ~Month, y = ~Count, color = ~Burrow, type = 'bar') %>% layout(yaxis = list(title = 'Count'), xaxis = xform, barmode = 'group')
 
 ```
 
-```{r}
-data<- read_csv("rides.csv")
-data<- data[-130001,]
-xform <- list(categoryorder = "array", categoryarray = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+# Top locations for Burrow and Month
 
+```{r, warning = FALSE, message = FALSE}
+data<- read_csv("CSVs/burrows.csv")
+
+burrow_locations<- data %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Month, Lat_Long) %>% summarise(count = n()) %>% arrange(desc(count)) %>% top_n(n = 50, wt = count)
+burrow_locations<- burrow_locations[c(1:50),] %>% arrange(desc(Month))
+
+burrow_address<- data %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% left_join(burrow_locations, by = "Lat_Long") %>% filter(is.na(count) == FALSE) %>% distinct(Lat_Long, Month.y, .keep_all = TRUE) %>% mutate(Address = revgeo(Lon, Lat)) %>% arrange(desc(count))
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+add_func<- function(x) {
+  for (i in 1:nrow(x)) {
+    row<- x[i,1]
+    row_split<- strsplit(as.character(row), ",")
+    if (grepl("Street Not Found", row_split[[1]][1]) == TRUE) {
+      x[i,1]<- ""
+    }
+  }
+  return(x)
+}
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+burrow_add_df<- cbind(unlist(burrow_address$Address), burrow_address$Burrow, burrow_address$Month.x, burrow_address$count)
+colnames(burrow_add_df)<- c("Address", "Burrow", "Month", "Count")
+x<- as.data.frame(burrow_add_df[,1])
+y<- add_func(x)
+burrow_add_df<- cbind(y, burrow_add_df[,-1])
+colnames(burrow_add_df)<- c("Address", "Burrow", "Month", "Count")
+
+burrow_add_df<- burrow_add_df %>% filter(is.na(Address) == FALSE)
+
+new_burrow_add_df<- data.frame("Address" = c(rep(0, 33)))
+for (i in 1:nrow(burrow_add_df)) {
+  if (grepl("House Number Not", strsplit(as.character(burrow_add_df$Address), "Found")[[i]][1]) == TRUE) {
+    x<- strsplit(as.character(burrow_add_df$Address), "Found")[[i]][2]
+    new_burrow_add_df[i,1]<- x
+  }
+  else {
+    new_burrow_add_df[i,1]<- as.vector(burrow_add_df[i,1])
+  }
+}
+burrow_add_df<- cbind(new_burrow_add_df, burrow_add_df[,2:4]) %>% kable() %>% kable_styling()
+burrow_add_df
+
+```
+
+# Taxi vs Uber Plot  
+
+```{r, warning = FALSE, message = FALSE}
+data<- read_csv("CSVs/rides.csv")
+data<- data[-130001,]
+
+xform <- list(categoryorder = "array", categoryarray = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
 
 plot_ly(data, type = 'violin') %>% 
   add_trace(x = ~Day[data$Label == 'Uber'], y = ~Time[data$Label == 'Uber'], legendgroup = 'Uber', scalegroup = 'Uber', name = 'Uber', box = list(visible = T), meanline = list(visible = T), color = I("#807aa5")) %>% 
-  add_trace(x = ~Day[data$Label == 'Taxi'], y = ~Time[data$Label == 'Taxi'], legendgroup = 'Taxi', scalegroup = 'Taxi', name = 'Taxi', box = list(visible = T), meanline = list(visible = T), color = I("#2e8b57")) %>% 
-  layout(yaxis = list(zeroline = F, title = "Time"), xaxis = xform, violinmode = 'group')
+  add_trace(x = ~Day[data$Label == 'Taxi'], y = ~Time[data$Label == 'Taxi'], legendgroup = 'Taxi', scalegroup = 'Taxi', name = 'Taxi', box = list(visible = T), meanline = list(visible = T), color = I("#2e8b57")) %>% layout(xaxis = list(title = "Day")) %>% layout(yaxis = list(zeroline = F, title = "Time"), xaxis = xform, violinmode = 'group')
 
+```
+
+# Taxi vs Uber Classification  
+
+```{r, warning = FALSE, message = FALSE}
+data<- read_csv("CSVs/rides.csv")
+data<- data[-130001,]
+
+data<- data %>% mutate(Class = ifelse(Label == "Uber", 1 ,0))
+data$Class = factor(data$Class, levels = c(0, 1)) 
+data<- data[, -c(2, 4)]
+
+set.seed(100)
+split<- sample.split(data$Class, SplitRatio = 0.50) 
+training_set<- subset(data, split == TRUE) 
+test_set<- subset(data, split == FALSE) 
+
+classifier<- lda(formula = Class ~., data = training_set)
+y_pred = predict(classifier, newdata = test_set) 
+actual<- as.vector(unlist(test_set[,5]))
+sum(as.numeric(as.character(y_pred$class)) != as.numeric(as.character(actual)))/nrow(test_set)
+
+```
+
+# Top locations for Taxi and Uber
+
+```{r, warning = FALSE, message = FALSE}
+data<- read_csv("CSVs/rides.csv")
+data<- data[-130001,]
+
+uber_locations<- data %>% filter(Label == "Uber") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Label, Lat_Long) %>% summarise(count = n()) %>% top_n(n = 25, wt =count) 
+
+uber_address<- data %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% left_join(uber_locations, by = "Lat_Long") %>% filter(is.na(count) == FALSE) %>% distinct(Lat_Long, .keep_all = TRUE) %>% mutate(Address = revgeo(Lon, Lat))
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+taxi_locations<- data %>% filter(Label == "Taxi") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% group_by(Label, Lat_Long) %>% summarise(count = n()) %>% top_n(n = 15, wt =count) 
+
+taxi_address<- data %>% mutate(Lat_Long = paste(Lat, Lon, sep = ",")) %>% left_join(taxi_locations, by = "Lat_Long") %>% filter(is.na(count) == FALSE) %>% distinct(Lat_Long, .keep_all = TRUE) %>% mutate(Address = revgeo(Lon, Lat))
+
+```
+
+
+```{r, warning = FALSE, message = FALSE}
+add_func<- function(x) {
+  for (i in 1:nrow(x)) {
+    row<- x[i,1]
+    row_split<- strsplit(as.character(row), ",")
+    if (grepl("Street Not Found", row_split[[1]][1]) == TRUE) {
+      x[i,1]<- ""
+    }
+  }
+  return(x)
+}
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+uber_add_df<- cbind(unlist(uber_address$Address), uber_address$count)
+colnames(uber_add_df)<- c("Address", "Count")
+x<- as.data.frame(uber_add_df[,1])
+y<- add_func(x)
+uber_add_df<- cbind(y, uber_add_df[,-1])
+colnames(uber_add_df)<- c("Address", "Count")
+
+uber_add_df<- uber_add_df %>% filter(is.na(Address) == FALSE)
+
+new_uber_add_df<- data.frame("Address" = c(rep(0, 14)))
+for (i in 1:nrow(uber_add_df)) {
+  if (grepl("House Number Not", strsplit(as.character(uber_add_df$Address), "Found")[[i]][1]) == TRUE) {
+    x<- strsplit(as.character(uber_add_df$Address), "Found")[[i]][2]
+    new_uber_add_df[i,1]<- x
+  }
+  else {
+    new_uber_add_df[i,1]<- as.vector(uber_add_df[i,1])
+  }
+}
+uber_add_df<- cbind(new_uber_add_df, uber_add_df[,2])
+colnames(uber_add_df)<- c("Address", "Count")
+uber_add_df<- uber_add_df %>% arrange(desc(Count)) %>% kable() %>% kable_styling()
+uber_add_df
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+taxi_add_df<- cbind(unlist(taxi_address$Address), taxi_address$count)
+colnames(taxi_add_df)<- c("Address", "Count")
+x<- as.data.frame(taxi_add_df[,1])
+y<- add_func(x)
+taxi_add_df<- cbind(y, taxi_add_df[,-1])
+colnames(taxi_add_df)<- c("Address", "Count")
+
+taxi_add_df<- taxi_add_df %>% filter(is.na(Address) == FALSE)
+
+new_taxi_add_df<- data.frame("Address" = c(rep(0, 8)))
+for (i in 1:nrow(taxi_add_df)) {
+  if (grepl("House Number Not", strsplit(as.character(taxi_add_df$Address), "Found")[[i]][1]) == TRUE) {
+    x<- strsplit(as.character(taxi_add_df$Address), "Found")[[i]][2]
+    new_taxi_add_df[i,1]<- x
+  }
+  else {
+    new_taxi_add_df[i,1]<- as.vector(taxi_add_df[i,1])
+  }
+}
+taxi_add_df<- cbind(new_taxi_add_df, taxi_add_df[,2])
+colnames(taxi_add_df)<- c("Address", "Count")
+taxi_add_df<- taxi_add_df %>% arrange(desc(as.numeric(as.character(Count)))) %>% kable() %>% kable_styling()
+taxi_add_df
 
 ```
