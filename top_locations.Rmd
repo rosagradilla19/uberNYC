@@ -20,6 +20,34 @@ rides <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/mast
 
 ```
 
+# Top 50 locations (in general) grouped by month and Burrow
+```{r}
+burrows2 <- burrows %>% mutate(Lat_Long= paste(Lat,Lon, sep= ","))
+top_50 <- burrows2 %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+burrows_top_50 <- top_50 %>% left_join(burrows2, by = "Lat_Long") %>% distinct(Lat_Long, .keep_all = TRUE) %>% top_n(n = 50, wt = count)
+```
+
+```{r}
+       mapboxToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ'
+       
+       Sys.setenv("MAPBOX_TOKEN" = mapboxToken)
+       
+       top_50_map <-  burrows_top_50 %>% plot_mapbox(lat= ~Lat, lon= ~Lon,
+                                      mode='scattermapbox', opacity=0.7, size=~count, sizeref=0.5) #marker=list( sizeref=3))
+                                                                                    
+       top_50_map <- top_50_map %>% layout(title='Top 50 pickup locations in NYC', height=600,
+                             mapbox = list(zoom=10,
+                                           center= list(lat = 40.7426,
+                                                        lon = -73.9831),
+                                           style = 'outdoors'
+                             ))
+       
+       top_50_map <- top_50_map %>% config(mapboxAccessToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ')
+       #fig <- fig %>% animation_opts(redraw=TRUE)
+       top_50_map
+```
+
+# Top 50 uber vs taxi
 ```{r}
 uber_locations_full <- rides %>% filter(Label == "Uber") %>% mutate(Lat_Long = paste(Lat, Lon, sep = ","))
 
