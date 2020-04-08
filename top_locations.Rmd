@@ -8,6 +8,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
 library(plotly)
+library(readr)
 ```
 
 ```{r}
@@ -23,9 +24,24 @@ rides <- read_csv("https://raw.githubusercontent.com/rosagradilla19/uberNYC/mast
 # Top 50 locations (in general) grouped by month and Burrow
 ```{r}
 burrows2 <- burrows %>% mutate(Lat_Long= paste(Lat,Lon, sep= ","))
-top_50 <- burrows2 %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
-burrows_top_50 <- top_50 %>% left_join(burrows2, by = "Lat_Long") %>% distinct(Lat_Long, .keep_all = TRUE) %>% top_n(n = 50, wt = count)
+#top_50 <- burrows2 %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+
+#burrows_top_50 <- top_50 %>% left_join(burrows2, by = "Lat_Long") %>%  distinct(Lat_Long, .keep_all = TRUE) %>% top_n(n = 50, wt = count)
 ```
+
+```{r}
+top_april <- burrows2 %>% filter(Month == "April") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+top_may <- burrows2 %>% filter(Month == "May") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+top_june <- burrows2 %>% filter(Month == "June") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+top_june <- burrows2 %>% filter(Month == "July") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+top_july <- burrows2 %>% filter(Month == "August") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+top_august <- burrows2 %>% filter(Month == "September") %>% group_by(Lat_Long) %>% summarise(count = n()) %>% top_n(n=50, wt=count)
+
+top_all <- rbind(top_april,top_may,top_june,top_july,top_august)
+
+burrows_top_50 <- top_all %>% left_join(burrows2, by = "Lat_Long") %>%  distinct(Lat_Long, .keep_all = TRUE) %>% top_n(n = 50, wt = count)
+```
+
 
 ```{r}
        mapboxToken = 'pk.eyJ1Ijoicm9zYWdyYWRpbGxhIiwiYSI6ImNrN25wb21mZTAxMG4zcHQzam1qaTF5MTYifQ.OHXhzQkkdmT9aH3A8-5ftQ'
